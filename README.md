@@ -85,6 +85,10 @@ Compare two or more institutions (or institution groups) side by side.
 - **Metric distribution** — box plot (rank, H-index, citations, or composite) with group-aware labels
 - **Top 5 scholars** — expandable list per institution/group, ranked by selected year/type
 
+## Data Source
+
+Ioannidis, John P.A. (2024), "August 2024 data-update for "Updated science-wide author databases of standardized citation indicators"", Elsevier Data Repository, V7, doi: [10.17632/btchxktzyw.7](https://doi.org/10.17632/btchxktzyw.7)
+
 ## Installation
 
 ```bash

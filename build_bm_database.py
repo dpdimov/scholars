@@ -59,6 +59,7 @@ FUZZY_THRESHOLD = 90
 
 # Path to entrepreneurship reviewer database (optional)
 ENT_REVIEWER_DB = Path("/Users/dpd24/Dropbox/PycharmProjects/ent-reviewers/scopus_reviewer_database.xlsx")
+MIN_ENT_PUBS = 3  # minimum total publications across entrepreneurship journals to qualify
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -373,9 +374,13 @@ def flag_entrepreneurship(merged: pd.DataFrame) -> pd.DataFrame:
         return merged
 
     print("\nFlagging entrepreneurship scholars...")
-    ent_df = pd.read_excel(ENT_REVIEWER_DB, usecols=["Name"])
+    ent_df = pd.read_excel(ENT_REVIEWER_DB)
+    journal_cols = [c for c in ent_df.columns if c.startswith("Pubs_")]
+    ent_df["_total_ent_pubs"] = ent_df[journal_cols].sum(axis=1)
+    total_before = len(ent_df)
+    ent_df = ent_df[ent_df["_total_ent_pubs"] >= MIN_ENT_PUBS]
     ent_names = ent_df["Name"].dropna().unique()
-    print(f"  Loaded {len(ent_names)} entrepreneurship reviewers")
+    print(f"  Loaded {total_before} reviewers, {len(ent_names)} with >= {MIN_ENT_PUBS} entrepreneurship pubs")
 
     # Build normalized lookup from reviewer names
     ent_norms = {normalize_name(n): n for n in ent_names}
