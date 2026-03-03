@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+
+# Build artifacts / cache
+_cache/
+bm_scholars_database.xlsx
+fuzzy_matches_review.csv
