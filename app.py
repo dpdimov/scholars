@@ -59,10 +59,10 @@ st.sidebar.markdown(f"**{len(filtered):,}** / {len(df):,} scholars")
 
 st.sidebar.divider()
 st.sidebar.markdown(
-    "**Data source:** Ioannidis, John P.A. (2024), "
-    '"August 2024 data-update for "Updated science-wide author databases of '
-    'standardized citation indicators"", Elsevier Data Repository, V7, '
-    "doi: [10.17632/btchxktzyw.7](https://doi.org/10.17632/btchxktzyw.7)",
+    "**Data source:** Ioannidis, John P.A. (2025), "
+    '"August 2025 data-update for "Updated science-wide author databases of '
+    'standardized citation indicators"", Elsevier Data Repository, V8, '
+    "doi: [10.17632/btchxktzyw.8](https://doi.org/10.17632/btchxktzyw.8)",
     unsafe_allow_html=False,
 )
 st.sidebar.markdown("**Created by:** Dimo Dimov")

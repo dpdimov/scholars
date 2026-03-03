@@ -87,7 +87,7 @@ Compare two or more institutions (or institution groups) side by side.
 
 ## Data Source
 
-Ioannidis, John P.A. (2024), "August 2024 data-update for "Updated science-wide author databases of standardized citation indicators"", Elsevier Data Repository, V7, doi: [10.17632/btchxktzyw.7](https://doi.org/10.17632/btchxktzyw.7)
+Ioannidis, John P.A. (2025), "August 2025 data-update for "Updated science-wide author databases of standardized citation indicators"", Elsevier Data Repository, V8, doi: [10.17632/btchxktzyw.8](https://doi.org/10.17632/btchxktzyw.8)
 
 ## Installation
 
