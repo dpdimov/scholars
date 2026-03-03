@@ -57,6 +57,19 @@ filtered = df[mask]
 
 st.sidebar.markdown(f"**{len(filtered):,}** / {len(df):,} scholars")
 
+st.sidebar.divider()
+st.sidebar.markdown(
+    "**Data source:** Ioannidis, John P.A. (2024), "
+    '"August 2024 data-update for "Updated science-wide author databases of '
+    'standardized citation indicators"", Elsevier Data Repository, V7, '
+    "doi: [10.17632/btchxktzyw.7](https://doi.org/10.17632/btchxktzyw.7)",
+    unsafe_allow_html=False,
+)
+st.sidebar.markdown("**Created by:** Dimo Dimov")
+st.sidebar.markdown(
+    "**License:** [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)"
+)
+
 # ── Tabs ──
 tab1, tab2, tab3, tab4 = st.tabs(["Scholar Table", "Visualizations", "Scholar Profile", "Institution Comparison"])
 
