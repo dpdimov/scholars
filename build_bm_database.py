@@ -59,7 +59,7 @@ FUZZY_THRESHOLD = 90
 
 # Path to entrepreneurship reviewer database (optional)
 ENT_REVIEWER_DB = Path("/Users/dpd24/Dropbox/PycharmProjects/ent-reviewers/scopus_reviewer_database.xlsx")
-MIN_ENT_PUBS = 3  # minimum total publications across entrepreneurship journals to qualify
+MIN_ENT_PUBS = 5  # minimum total publications across entrepreneurship journals to qualify
 
 # ---------------------------------------------------------------------------
 # Helpers
