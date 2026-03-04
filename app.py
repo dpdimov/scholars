@@ -15,7 +15,10 @@ METRICS = ["rank", "rank_ns", "h", "h_ns", "nc", "nc_ns", "c", "c_ns",
 @st.cache_data
 def load_data():
     df = pd.read_csv("bm_scholars_database.csv")
-    df["entrepreneurship"] = df["entrepreneurship"].astype(str).str.strip().str.lower() == "true"
+    if "entrepreneurship" in df.columns:
+        df["entrepreneurship"] = df["entrepreneurship"].astype(str).str.strip().str.lower() == "true"
+    else:
+        df["entrepreneurship"] = False
     return df
 
 
