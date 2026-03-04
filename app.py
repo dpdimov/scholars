@@ -84,6 +84,15 @@ with tab1:
     yt = st.selectbox("Year + Type", get_year_type_options(), index=get_year_type_options().index("career 2024"), key="tab1_yt")
     typ, yr = parse_year_type(yt)
 
+    institutions_tab1 = sorted(filtered["inst_name"].dropna().unique())
+    sel_insts_tab1 = st.multiselect(
+        "Filter by institution", institutions_tab1, key="tab1_inst",
+        placeholder="Type to search institutions..."
+    )
+    tab1_filtered = filtered
+    if sel_insts_tab1:
+        tab1_filtered = filtered[filtered["inst_name"].isin(sel_insts_tab1)]
+
     display_cols = {
         "authfull": "Name",
         "inst_name": "Institution",
@@ -94,8 +103,8 @@ with tab1:
         col_name(typ, yr, "nc"): "Citations",
         col_name(typ, yr, "c"): "Composite (C)",
     }
-    existing = {k: v for k, v in display_cols.items() if k in filtered.columns}
-    view = filtered[list(existing.keys())].rename(columns=existing)
+    existing = {k: v for k, v in display_cols.items() if k in tab1_filtered.columns}
+    view = tab1_filtered[list(existing.keys())].rename(columns=existing)
     view = view.sort_values("Rank", na_position="last")
 
     st.dataframe(view.reset_index(drop=True), use_container_width=True, height=600)
