@@ -62,13 +62,8 @@ FUZZY_THRESHOLD = 90
 MERGE_OVERRIDES = SCRIPT_DIR / "merge_overrides.csv"
 
 # Path to entrepreneurship reviewer database (optional)
-# Search common locations relative to this project's Dropbox root
-_DROPBOX_ROOT = SCRIPT_DIR.parent
-ENT_REVIEWER_DB_CANDIDATES = [
-    _DROPBOX_ROOT / "ent-reviewers" / "scopus_reviewer_database.xlsx",
-    _DROPBOX_ROOT / "editor" / "scopus_reviewer_database.xlsx",
-]
-ENT_REVIEWER_DB = next((p for p in ENT_REVIEWER_DB_CANDIDATES if p.exists()), ENT_REVIEWER_DB_CANDIDATES[0])
+# Relative to Dropbox/PycharmProjects/ — works across machines synced via Dropbox
+ENT_REVIEWER_DB = SCRIPT_DIR.parent / "editor" / "scopus_reviewer_database.xlsx"
 MIN_ENT_PUBS = 5  # minimum total publications across entrepreneurship journals to qualify
 
 # ---------------------------------------------------------------------------
