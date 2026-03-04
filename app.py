@@ -171,7 +171,7 @@ with tab2:
     if rank_inst_col in filtered.columns:
         inst_avg = (filtered.dropna(subset=[rank_inst_col])
                     .groupby("inst_name")[rank_inst_col].mean()
-                    .nsmallest(20).sort_values(ascending=True))
+                    .nsmallest(20).sort_values(ascending=False))
         fig_inst = px.bar(x=inst_avg.values, y=inst_avg.index, orientation="h",
                           labels={"x": "Avg Rank", "y": "Institution"})
         fig_inst.update_layout(height=500)
