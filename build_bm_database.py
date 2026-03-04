@@ -29,7 +29,10 @@ FILE_PATTERN = re.compile(
 )
 
 # Columns to keep from each file (original names)
-KEEP_COLS_STABLE = ["authfull", "inst_name", "cntry", "firstyr", "lastyr"]
+KEEP_COLS_STABLE = ["authfull", "firstyr", "lastyr"]
+
+# Columns that vary with each annual dataset and get prefixed like metrics
+TIME_VARYING_COLS = ["inst_name", "cntry"]
 
 # Columns with fixed names across all years
 FIXED_METRIC_COLS = {
@@ -56,6 +59,7 @@ VARIABLE_METRIC_PATTERNS = [
 ]
 
 FUZZY_THRESHOLD = 90
+MERGE_OVERRIDES = SCRIPT_DIR / "merge_overrides.csv"
 
 # Path to entrepreneurship reviewer database (optional)
 ENT_REVIEWER_DB = Path("/Users/dpd24/Dropbox/PycharmProjects/ent-reviewers/scopus_reviewer_database.xlsx")
@@ -64,6 +68,26 @@ MIN_ENT_PUBS = 5  # minimum total publications across entrepreneurship journals 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def load_merge_overrides(path: Path = MERGE_OVERRIDES) -> dict[str, str]:
+    """Load manual merge overrides from CSV. Returns {alias: canonical_name}."""
+    if not path.exists():
+        return {}
+    df = pd.read_csv(path)
+    return dict(zip(df["alias"], df["canonical_name"]))
+
+
+def apply_merge_overrides(df: pd.DataFrame, overrides: dict[str, str]) -> int:
+    """Replace authfull values matching any alias with the canonical name.
+
+    Modifies df in place. Returns number of replacements made.
+    """
+    mask = df["authfull"].isin(overrides)
+    count = mask.sum()
+    if count > 0:
+        df.loc[mask, "authfull"] = df.loc[mask, "authfull"].map(overrides)
+    return count
+
 
 def cache_path_for(year: int, ftype: str) -> Path:
     """Return the cache CSV path for a given year/type combo."""
@@ -180,40 +204,45 @@ def load_or_extract(source: dict) -> pd.DataFrame:
         print(f"  Loading from cache: {cp.name}")
         df = pd.read_csv(cp)
         print(f"    → {len(df)} Business & Management scholars (cached)")
-        return df
+    else:
+        # Extract from xlsx
+        path = source["xlsx_path"]
+        print(f"  Reading {path.name} ...")
 
-    # Extract from xlsx
-    path = source["xlsx_path"]
-    print(f"  Reading {path.name} ...")
+        sheet = detect_sheet_name(path)
 
-    sheet = detect_sheet_name(path)
+        # First pass: read all columns to detect variable names
+        df_all = pd.read_excel(path, sheet_name=sheet, nrows=0)
+        all_headers = list(df_all.columns)
+        col_map = build_column_mapping(all_headers)
 
-    # First pass: read all columns to detect variable names
-    df_all = pd.read_excel(path, sheet_name=sheet, nrows=0)
-    all_headers = list(df_all.columns)
-    col_map = build_column_mapping(all_headers)
+        # Determine which columns to read
+        cols_to_read = (list(KEEP_COLS_STABLE) + TIME_VARYING_COLS
+                        + list(col_map.keys()) + ["sm-subfield-1"])
+        cols_to_read = [c for c in cols_to_read if c in all_headers]
 
-    # Determine which columns to read
-    cols_to_read = list(KEEP_COLS_STABLE) + list(col_map.keys()) + ["sm-subfield-1"]
-    cols_to_read = [c for c in cols_to_read if c in all_headers]
+        df = pd.read_excel(path, sheet_name=sheet, usecols=cols_to_read)
+        df = df[df["sm-subfield-1"] == "Business & Management"].copy()
+        print(f"    → {len(df)} Business & Management scholars")
 
-    df = pd.read_excel(path, sheet_name=sheet, usecols=cols_to_read)
-    df = df[df["sm-subfield-1"] == "Business & Management"].copy()
-    print(f"    → {len(df)} Business & Management scholars")
+        # Rename: actual col -> prefix + canonical name
+        rename_map = {actual: prefix + canonical for actual, canonical in col_map.items()}
+        df.rename(columns=rename_map, inplace=True)
 
-    # Rename: actual col -> prefix + canonical name
-    rename_map = {actual: prefix + canonical for actual, canonical in col_map.items()}
-    df.rename(columns=rename_map, inplace=True)
+        # Keep stable cols + time-varying cols + prefixed metric cols
+        prefixed = [prefix + canonical for canonical in col_map.values()]
+        keep = KEEP_COLS_STABLE + TIME_VARYING_COLS + prefixed
+        df = df[[c for c in keep if c in df.columns]]
 
-    # Keep stable cols + prefixed metric cols
-    prefixed = [prefix + canonical for canonical in col_map.values()]
-    keep = KEEP_COLS_STABLE + prefixed
-    df = df[[c for c in keep if c in df.columns]]
+        # Save to cache
+        CACHE_DIR.mkdir(exist_ok=True)
+        df.to_csv(cp, index=False)
+        print(f"    Cached to {cp.name}")
 
-    # Save to cache
-    CACHE_DIR.mkdir(exist_ok=True)
-    df.to_csv(cp, index=False)
-    print(f"    Cached to {cp.name}")
+    # Prefix time-varying columns (inst_name, cntry) with year/type
+    for col in TIME_VARYING_COLS:
+        if col in df.columns:
+            df.rename(columns={col: prefix + col}, inplace=True)
 
     return df
 
@@ -258,6 +287,15 @@ def merge_all(dfs: list[pd.DataFrame]) -> pd.DataFrame:
             on="authfull", how="left",
         )
 
+        # Update lastyr for exact matches (keep maximum)
+        if "lastyr" in df_new.columns and matched_in_merged:
+            temp = df_new[df_new["authfull"].isin(matched_in_merged)][["authfull", "lastyr"]].rename(
+                columns={"lastyr": "_new_lastyr"})
+            merged = merged.merge(temp, on="authfull", how="left")
+            mask = merged["_new_lastyr"].notna()
+            merged.loc[mask, "lastyr"] = merged.loc[mask, ["lastyr", "_new_lastyr"]].max(axis=1)
+            merged.drop(columns=["_new_lastyr"], inplace=True)
+
         # --- Pass 2: Fuzzy match for unmatched ---
         unmatched_new = df_new[~df_new["authfull"].isin(matched_in_new)].copy()
         unmatched_merged_mask = ~merged["authfull"].isin(matched_in_merged)
@@ -269,13 +307,34 @@ def merge_all(dfs: list[pd.DataFrame]) -> pd.DataFrame:
             merged_norms = unmatched_merged["_norm"].tolist()
             merged_idxs = unmatched_merged.index.tolist()
             merged_auths = unmatched_merged["authfull"].tolist()
-            merged_insts = unmatched_merged["inst_name"].fillna("").tolist()
-            merged_cntrs = unmatched_merged["cntry"].fillna("").tolist()
+
+            # Resolve best institution/country from prefixed columns for boosting
+            inst_cols_m = sorted(
+                [c for c in merged.columns if c.endswith("_inst_name")],
+                key=lambda c: int(re.search(r"(\d{4})", c).group(1)),
+                reverse=True,
+            )
+            cntry_cols_m = sorted(
+                [c for c in merged.columns if c.endswith("_cntry")],
+                key=lambda c: int(re.search(r"(\d{4})", c).group(1)),
+                reverse=True,
+            )
+            if inst_cols_m:
+                merged_insts = unmatched_merged[inst_cols_m].bfill(axis=1).iloc[:, 0].fillna("").tolist()
+            else:
+                merged_insts = [""] * len(unmatched_merged)
+            if cntry_cols_m:
+                merged_cntrs = unmatched_merged[cntry_cols_m].bfill(axis=1).iloc[:, 0].fillna("").tolist()
+            else:
+                merged_cntrs = [""] * len(unmatched_merged)
+
+            new_inst_col = next((c for c in df_new.columns if c.endswith("_inst_name")), None)
+            new_cntry_col = next((c for c in df_new.columns if c.endswith("_cntry")), None)
 
             for new_idx, new_row in unmatched_new.iterrows():
                 new_norm = new_row["_norm"]
-                new_inst = str(new_row.get("inst_name", "") or "")
-                new_cntry = str(new_row.get("cntry", "") or "")
+                new_inst = str(new_row.get(new_inst_col, "") or "") if new_inst_col else ""
+                new_cntry = str(new_row.get(new_cntry_col, "") or "") if new_cntry_col else ""
                 best_score = 0
                 best_m_idx = None
 
@@ -316,11 +375,12 @@ def merge_all(dfs: list[pd.DataFrame]) -> pd.DataFrame:
         for new_idx, (m_idx, score, _, _) in fuzzy_matches.items():
             for col in metric_cols:
                 merged.at[m_idx, col] = unmatched_new.at[new_idx, col]
-            # Update stable cols if newer data
-            for sc in ["inst_name", "cntry", "lastyr"]:
-                val = unmatched_new.at[new_idx, sc]
-                if pd.notna(val):
-                    merged.at[m_idx, sc] = val
+            # Update lastyr (keep maximum)
+            new_lastyr = unmatched_new.at[new_idx, "lastyr"]
+            if pd.notna(new_lastyr):
+                old_lastyr = merged.at[m_idx, "lastyr"]
+                if pd.isna(old_lastyr) or new_lastyr > old_lastyr:
+                    merged.at[m_idx, "lastyr"] = new_lastyr
 
         # Append truly new scholars (no match at all)
         matched_new_idxs = set(fuzzy_matches.keys())
@@ -456,9 +516,39 @@ def main():
         df = load_or_extract(s)
         dfs.append(df)
 
+    # Step 2b: Apply manual merge overrides
+    overrides = load_merge_overrides()
+    if overrides:
+        print(f"\nApplying {len(overrides)} manual merge override(s)...")
+        total_replaced = 0
+        for df in dfs:
+            total_replaced += apply_merge_overrides(df, overrides)
+        for alias, canonical in overrides.items():
+            print(f"  '{alias}' → '{canonical}'")
+        print(f"  {total_replaced} record(s) renamed across all sources")
+
     # Step 3: Merge
     print("\nMerging into single database...")
     merged, fuzzy_log = merge_all(dfs)
+
+    # Step 3a: Compute current institution/country from most recent year
+    inst_cols = sorted(
+        [c for c in merged.columns if c.endswith("_inst_name")],
+        key=lambda c: int(re.search(r"(\d{4})", c).group(1)),
+        reverse=True,
+    )
+    cntry_cols = sorted(
+        [c for c in merged.columns if c.endswith("_cntry")],
+        key=lambda c: int(re.search(r"(\d{4})", c).group(1)),
+        reverse=True,
+    )
+    auth_idx = merged.columns.get_loc("authfull")
+    if inst_cols:
+        merged.insert(auth_idx + 1, "inst_name",
+                       merged[inst_cols].bfill(axis=1).iloc[:, 0])
+    if cntry_cols:
+        merged.insert(auth_idx + 2, "cntry",
+                       merged[cntry_cols].bfill(axis=1).iloc[:, 0])
 
     # Step 3b: Save fuzzy match review file
     if fuzzy_log:
